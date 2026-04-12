@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لعبة تخمين الأرقام</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Tajawal:wght@300;400;700;900&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0a12;
+      --surface: #12121e;
+      --surface2: #1a1a2e;
+      --accent: #7c3aed;
+      --accent2: #a855f7;
+      --gold: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --border: rgba(124,58,237,0.3);
+      --glow: 0 0 40px rgba(124,58,237,0.4);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Cairo', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse 80% 50% at 20% 20%, rgba(124,58,237,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 60% at 80% 80%, rgba(168,85,247,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(245,158,11,0.04) 0%, transparent 60%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .stars {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle var(--dur, 3s) ease-in-out infinite var(--delay, 0s);
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.1; }
+      50% { opacity: 0.8; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 520px;
+      padding: 20px;
+    }
+
+    /* SCREENS */
+    .screen { display: none; animation: fadeIn 0.5s ease; }
+    .screen.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* LOGO */
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo-icon {
+      font-size: 56px;
+      display: block;
+      animation: float 3s ease-in-out infinite;
+      filter: drop-shadow(0 0 20px rgba(245,158,11,0.6));
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    .logo h1 {
+      font-family: 'Tajawal', sans-serif;
+      font-weight: 900;
+      font-size: 2.2rem;
+      background: linear-gradient(135deg, #a855f7, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+      margin-top: 8px;
+    }
+    .logo p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 6px;
+    }
+
+    /* CARD */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 32px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .card-title {
+      font-weight: 700;
+      font-size: 1.3rem;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-title span { font-size: 1.5rem; }
+
+    /* INPUTS */
+    .form-group { margin-bottom: 18px; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    input[type=text], input[type=email], input[type=number] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: var(--text);
+      font-family: 'Cairo', sans-serif;
+      font-size: 1rem;
+      transition: all 0.2s;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.2);
+    }
+    input[type=number] { text-align: center; font-size: 1.5rem; font-weight: 700; }
+
+    /* BUTTONS */
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border-radius: 14px;
+      font-family: 'Cairo', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      box-shadow: 0 8px 25px rgba(124,58,237,0.4);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(124,58,237,0.5); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      margin-top: 12px;
+    }
+    .btn-secondary:hover { background: rgba(124,58,237,0.15); }
+    .btn-gold {
+      background: linear-gradient(135deg, #d97706, #f59e0b);
+      color: #1a1a00;
+      box-shadow: 0 8px 25px rgba(245,158,11,0.3);
+    }
+    .btn-gold:hover { transform: translateY(-2px); }
+    .btn-green {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: white;
+      box-shadow: 0 8px 25px rgba(16,185,129,0.3);
+    }
+    .btn-green:hover { transform: translateY(-2px); }
+
+    /* DIVIDER */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ROOM CODE */
+    .room-code {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.1));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    .room-code label { font-size: 0.8rem; margin-bottom: 4px; }
+    .code-display {
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 6px;
+      background: linear-gradient(135deg, #a855f7, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .copy-hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+    /* PLAYERS BAR */
+    .players-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .player-chip {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .player-chip.active-turn {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(124,58,237,0.3);
+    }
+    .player-chip.winner-chip {
+      border-color: var(--gold);
+      box-shadow: 0 0 20px rgba(245,158,11,0.4);
+    }
+    .player-chip .p-name { font-weight: 700; font-size: 0.95rem; }
+    .player-chip .p-status { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .vs-badge {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 900;
+      flex-shrink: 0;
+      box-shadow: var(--glow);
+    }
+
+    /* GUESS HISTORY */
+    .guess-history {
+      background: var(--surface2);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 16px;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+    .guess-history::-webkit-scrollbar { width: 4px; }
+    .guess-history::-webkit-scrollbar-track { background: transparent; }
+    .guess-history::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+    .guess-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.9rem;
+      animation: slideIn 0.3s ease;
+    }
+    .guess-item:last-child { border-bottom: none; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .guess-number { font-weight: 800; font-size: 1.1rem; color: var(--accent2); }
+    .hint-badge {
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .hint-bigger { background: rgba(16,185,129,0.15); color: var(--green); }
+    .hint-smaller { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    /* NUMBER INPUT SLIDER */
+    .number-display {
+      text-align: center;
+      margin: 20px 0;
+    }
+    .big-number {
+      font-size: 4rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #a855f7, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--accent) var(--pct, 0%), var(--surface2) var(--pct, 0%));
+      border-radius: 3px;
+      outline: none;
+      margin: 16px 0;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 15px rgba(124,58,237,0.6);
+      border: 2px solid white;
+    }
+    .range-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* STATUS MESSAGES */
+    .status-msg {
+      text-align: center;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      margin: 16px 0;
+    }
+    .status-waiting {
+      background: rgba(124,58,237,0.1);
+      border: 1px solid rgba(124,58,237,0.2);
+      color: var(--accent2);
+    }
+    .status-your-turn {
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.2);
+      color: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .status-wait-turn {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.2);
+      color: var(--gold);
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.2); }
+      50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+    }
+
+    /* WINNER SCREEN */
+    .winner-crown {
+      font-size: 80px;
+      text-align: center;
+      display: block;
+      animation: bounce 0.5s ease infinite alternate;
+      filter: drop-shadow(0 0 30px rgba(245,158,11,0.8));
+    }
+    @keyframes bounce {
+      from { transform: translateY(0) scale(1); }
+      to { transform: translateY(-15px) scale(1.05); }
+    }
+    .winner-name {
+      font-family: 'Tajawal', sans-serif;
+      font-size: 2rem;
+      font-weight: 900;
+      text-align: center;
+      background: linear-gradient(135deg, #f59e0b, #fcd34d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 12px 0;
+    }
+    .reveal-number {
+      text-align: center;
+      background: var(--surface2);
+      border-radius: 16px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .reveal-number .label { font-size: 0.8rem; color: var(--muted); }
+    .reveal-number .num { font-size: 3rem; font-weight: 900; color: var(--accent2); }
+
+    /* ERROR */
+    .error-msg {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: var(--red);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* SPINNER */
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* WAITING DOTS */
+    .waiting-dots span {
+      animation: blink 1.4s ease-in-out infinite;
+      font-size: 1.5rem;
+    }
+    .waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+
+    .mt-12 { margin-top: 12px; }
+    .text-center { text-align: center; }
+    .text-muted { color: var(--muted); font-size: 0.85rem; }
+
+    /* confetti particles */
+    .confetti-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 999; }
+    .confetti-piece {
+      position: absolute;
+      width: 10px; height: 10px;
+      top: -10px;
+      animation: confettiFall linear forwards;
+      border-radius: 2px;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 20px; }
+      .code-display { font-size: 2rem; letter-spacing: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="container">
+
+  <!-- SCREEN 1: REGISTER -->
+  <div class="screen active" id="screen-register">
+    <div class="logo">
+      <span class="logo-icon">🎯</span>
+      <h1>تخمين الأرقام</h1>
+      <p>العب مع صديقك واخمن رقمه السري!</p>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>👤</span> سجّل دخولك</div>
+      <div class="form-group">
+        <label>الاسم</label>
+        <input type="text" id="reg-name" placeholder="اكتب اسمك..." maxlength="20" />
+      </div>
+      <div class="form-group">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="reg-email" placeholder="example@email.com" />
+      </div>
+      <div class="error-msg" id="reg-error"></div>
+      <button class="btn btn-primary mt-12" onclick="register()">
+        دخول 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: LOBBY -->
+  <div class="screen" id="screen-lobby">
+    <div class="logo">
+      <span class="logo-icon">🎯</span>
+      <h1>تخمين الأرقام</h1>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🏠</span> اللوبي</div>
+      <p class="text-muted" style="margin-bottom:20px">أهلاً <strong id="lobby-name" style="color:var(--accent2)"></strong>! دعوت صديق أو هتنضم لغرفته؟</p>
+      
+      <button class="btn btn-primary" onclick="createRoom()">
+        ➕ إنشاء غرفة جديدة
+      </button>
+      
+      <div class="divider">أو</div>
+      
+      <div class="form-group">
+        <label>كود الغرفة</label>
+        <input type="text" id="join-code" placeholder="ادخل كود الغرفة..." maxlength="6" style="text-align:center; letter-spacing:4px; font-size:1.3rem; font-weight:700;" />
+      </div>
+      <button class="btn btn-secondary" onclick="joinRoom()">
+        🔗 انضم لغرفة
+      </button>
+      <div class="error-msg" id="lobby-error"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: WAITING FOR PLAYER 2 -->
+  <div class="screen" id="screen-waiting">
+    <div class="card">
+      <div class="card-title"><span>⏳</span> انتظار صديقك</div>
+      <div class="room-code">
+        <label>شارك الكود ده مع صديقك</label>
+        <div class="code-display" id="display-room-code"></div>
+        <div class="copy-hint">اضغط للنسخ</div>
+      </div>
+      <div class="status-msg status-waiting">
+        <div class="waiting-dots">
+          بنستنى صديقك يدخل <span>.</span><span>.</span><span>.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: SET SECRET NUMBER -->
+  <div class="screen" id="screen-set-number">
+    <div class="card">
+      <div class="players-bar">
+        <div class="player-chip" id="p1-chip">
+          <div class="p-name" id="p1-name-chip">-</div>
+          <div class="p-status" id="p1-status-chip">⏳ بيختار</div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="player-chip" id="p2-chip">
+          <div class="p-name" id="p2-name-chip">-</div>
+          <div class="p-status" id="p2-status-chip">⏳ بيختار</div>
+        </div>
+      </div>
+      
+      <div class="card-title"><span>🔒</span> اختار رقمك السري</div>
+      <p class="text-muted" style="margin-bottom:16px">اختار رقم من 0 ل 100، صاحبك هيحاول يخمنه!</p>
+      
+      <div class="number-display">
+        <div class="big-number" id="secret-display">50</div>
+        <input type="range" id="secret-slider" min="0" max="100" value="50" oninput="updateSecret(this.value)" />
+        <div class="range-labels"><span>0</span><span>50</span><span>100</span></div>
+      </div>
+      
+      <button class="btn btn-gold" onclick="confirmSecret()" id="confirm-btn">
+        🔒 تأكيد الرقم السري
+      </button>
+      
+      <div id="waiting-opponent-msg" style="display:none">
+        <div class="status-msg status-waiting mt-12">
+          <div class="waiting-dots">بنستنى صاحبك يختار رقمه <span>.</span><span>.</span><span>.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: GAME IN PROGRESS -->
+  <div class="screen" id="screen-game">
+    <div class="card">
+      <div class="players-bar">
+        <div class="player-chip" id="g-p1-chip">
+          <div class="p-name" id="g-p1-name">-</div>
+          <div class="p-status" id="g-p1-turn">-</div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="player-chip" id="g-p2-chip">
+          <div class="p-name" id="g-p2-name">-</div>
+          <div class="p-status" id="g-p2-turn">-</div>
+        </div>
+      </div>
+
+      <div id="your-turn-section">
+        <div class="status-msg status-your-turn" id="game-status-msg">دورك! اخمن رقم صاحبك 🎯</div>
+        
+        <div class="number-display">
+          <div class="big-number" id="guess-display">50</div>
+          <input type="range" id="guess-slider" min="0" max="100" value="50" oninput="updateGuess(this.value)" />
+          <div class="range-labels"><span>0</span><span>50</span><span>100</span></div>
+        </div>
+        
+        <button class="btn btn-green" id="guess-btn" onclick="makeGuess()">
+          🎯 اخمن!
+        </button>
+      </div>
+
+      <div id="wait-turn-section" style="display:none">
+        <div class="status-msg status-wait-turn" id="wait-msg">صاحبك بيخمن...</div>
+      </div>
+
+      <div class="guess-history" id="guess-history">
+        <div class="text-muted text-center" style="padding:20px">لسه ماشتش تخمينات 🤷</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 6: GAME OVER -->
+  <div class="screen" id="screen-over">
+    <div class="confetti-wrap" id="confetti"></div>
+    <div class="card">
+      <span class="winner-crown">👑</span>
+      <div class="winner-name" id="winner-name-display">---</div>
+      <p class="text-center text-muted">فاز باللعبة!</p>
+      
+      <div class="reveal-number">
+        <div class="label">الرقم السري كان</div>
+        <div class="num" id="reveal-secret-num">--</div>
+      </div>
+      
+      <button class="btn btn-gold" onclick="playAgain()">
+        🔄 العب تاني
+      </button>
+      <button class="btn btn-secondary" onclick="goLobby()">
+        🏠 الرئيسية
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ─── Stars background ────────────────────────────────────────
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      top:${Math.random()*100}%;
+      --dur:${2+Math.random()*4}s;
+      --delay:${-Math.random()*4}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // ─── Copy room code ───────────────────────────────────────────
+  document.getElementById('display-room-code').onclick = function() {
+    navigator.clipboard?.writeText(this.textContent.trim());
+    this.style.transform = 'scale(1.1)';
+    setTimeout(() => this.style.transform = '', 200);
+  };
+
+  // ─── State ────────────────────────────────────────────────────
+  let myName = '', myEmail = '', myRole = '';
+  let player1Name = '', player2Name = '';
+  let secretNum = 50, guessNum = 50;
+  let currentRoomId = '';
+  let guessHistory = [];
+
+  // ─── SignalR connection ───────────────────────────────────────
+  const conn = new signalR.HubConnectionBuilder()
+    .withUrl("/gamehub")
+    .withAutomaticReconnect()
+    .build();
+
+  conn.start().then(() => console.log("Connected")).catch(e => console.error(e));
+
+  // ─── SignalR handlers ─────────────────────────────────────────
+  conn.on("RegistrationError", msg => showError('reg-error', msg));
+
+  conn.on("Registered", (name, email) => {
+    myName = name; myEmail = email;
+    document.getElementById('lobby-name').textContent = name;
+    showScreen('screen-lobby');
+  });
+
+  conn.on("RoomCreated", (roomId, name) => {
+    currentRoomId = roomId;
+    document.getElementById('display-room-code').textContent = roomId;
+    showScreen('screen-waiting');
+  });
+
+  conn.on("JoinError", msg => showError('lobby-error', msg));
+
+  conn.on("GameStarting", (p1, p2) => {
+    player1Name = p1; player2Name = p2;
+    updatePlayerChips();
+    guessHistory = [];
+    showScreen('screen-set-number');
+    document.getElementById('confirm-btn').disabled = false;
+    document.getElementById('confirm-btn').textContent = '🔒 تأكيد الرقم السري';
+    document.getElementById('waiting-opponent-msg').style.display = 'none';
+    updateSecret(50);
+    document.getElementById('secret-slider').value = 50;
+  });
+
+  conn.on("YouAre", role => myRole = role);
+
+  conn.on("NumberSet", num => {
+    document.getElementById('confirm-btn').disabled = true;
+    document.getElementById('confirm-btn').textContent = '✅ تم تأكيد ' + num;
+    document.getElementById('waiting-opponent-msg').style.display = 'block';
+    const myChip = myRole === 'player1' ? 'p1-status-chip' : 'p2-status-chip';
+    document.getElementById(myChip).textContent = '✅ جاهز';
+  });
+
+  conn.on("OpponentReady", msg => {
+    const oppChip = myRole === 'player1' ? 'p2-status-chip' : 'p1-status-chip';
+    document.getElementById(oppChip).textContent = '✅ جاهز';
+  });
+
+  conn.on("GameInProgress", msg => {
+    guessHistory = [];
+    renderHistory();
+    updateGuess(50);
+    document.getElementById('guess-slider').value = 50;
+    showScreen('screen-game');
+    updateGamePlayerChips();
+  });
+
+  conn.on("YourTurn", () => {
+    document.getElementById('your-turn-section').style.display = 'block';
+    document.getElementById('wait-turn-section').style.display = 'none';
+    document.getElementById('guess-btn').disabled = false;
+    document.getElementById('guess-btn').textContent = '🎯 اخمن!';
+    const myChipId = myRole === 'player1' ? 'g-p1-chip' : 'g-p2-chip';
+    const oppChipId = myRole === 'player1' ? 'g-p2-chip' : 'g-p1-chip';
+    document.getElementById(myChipId).classList.add('active-turn');
+    document.getElementById(oppChipId).classList.remove('active-turn');
+    document.getElementById(myRole==='player1'?'g-p1-turn':'g-p2-turn').textContent = '🎯 دورك!';
+    document.getElementById(myRole==='player1'?'g-p2-turn':'g-p1-turn').textContent = '⏳ بيستنى';
+  });
+
+  conn.on("WaitTurn", msg => {
+    document.getElementById('your-turn-section').style.display = 'none';
+    document.getElementById('wait-turn-section').style.display = 'block';
+    document.getElementById('wait-msg').textContent = msg;
+    const oppChipId = myRole === 'player1' ? 'g-p2-chip' : 'g-p1-chip';
+    const myChipId = myRole === 'player1' ? 'g-p1-chip' : 'g-p2-chip';
+    document.getElementById(oppChipId).classList.add('active-turn');
+    document.getElementById(myChipId).classList.remove('active-turn');
+    document.getElementById(myRole==='player1'?'g-p2-turn':'g-p1-turn').textContent = '🎯 بيخمن';
+    document.getElementById(myRole==='player1'?'g-p1-turn':'g-p2-turn').textContent = '⏳ بيستنى';
+  });
+
+  conn.on("GuessResult", (guess, hint) => {
+    guessHistory.push({ by: myName, guess, hint, isMe: true });
+    renderHistory();
+    document.getElementById('guess-btn').disabled = false;
+    document.getElementById('guess-btn').textContent = '🎯 اخمن!';
+  });
+
+  conn.on("OpponentGuessed", (oppName, guess, hint) => {
+    guessHistory.push({ by: oppName, guess, hint, isMe: false });
+    renderHistory();
+  });
+
+  conn.on("GuessAttempt", (name, guess) => { /* handled in GuessResult/OpponentGuessed */ });
+
+  conn.on("GameOver", (winnerName, winningGuess, secretNumber) => {
+    document.getElementById('winner-name-display').textContent = winnerName;
+    document.getElementById('reveal-secret-num').textContent = secretNumber;
+    showScreen('screen-over');
+    launchConfetti();
+  });
+
+  conn.on("GameReset", () => {
+    guessHistory = [];
+    showScreen('screen-set-number');
+    document.getElementById('confirm-btn').disabled = false;
+    document.getElementById('confirm-btn').textContent = '🔒 تأكيد الرقم السري';
+    document.getElementById('waiting-opponent-msg').style.display = 'none';
+    updateSecret(50);
+    document.getElementById('secret-slider').value = 50;
+    document.getElementById('p1-status-chip').textContent = '⏳ بيختار';
+    document.getElementById('p2-status-chip').textContent = '⏳ بيختار';
+  });
+
+  conn.on("OpponentLeft", msg => {
+    alert(msg);
+    goLobby();
+  });
+
+  conn.on("Error", msg => alert(msg));
+
+  // ─── Actions ──────────────────────────────────────────────────
+  function register() {
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    if (!name) { showError('reg-error', 'اكتب اسمك!'); return; }
+    if (!email || !email.includes('@')) { showError('reg-error', 'اكتب إيميل صح!'); return; }
+    hideError('reg-error');
+    conn.invoke("RegisterPlayer", name, email).catch(e => console.error(e));
+  }
+
+  function createRoom() {
+    hideError('lobby-error');
+    conn.invoke("CreateRoom", myName, myEmail).catch(e => console.error(e));
+  }
+
+  function joinRoom() {
+    const code = document.getElementById('join-code').value.trim();
+    if (!code || code.length !== 6) { showError('lobby-error', 'اكتب كود الغرفة (6 أرقام)!'); return; }
+    hideError('lobby-error');
+    currentRoomId = code;
+    conn.invoke("JoinRoom", code, myName, myEmail).catch(e => console.error(e));
+  }
+
+  function updateSecret(val) {
+    secretNum = parseInt(val);
+    document.getElementById('secret-display').textContent = val;
+    const pct = (val / 100) * 100;
+    document.getElementById('secret-slider').style.setProperty('--pct', pct + '%');
+  }
+
+  function confirmSecret() {
+    conn.invoke("SetSecretNumber", secretNum).catch(e => console.error(e));
+  }
+
+  function updateGuess(val) {
+    guessNum = parseInt(val);
+    document.getElementById('guess-display').textContent = val;
+    const pct = (val / 100) * 100;
+    document.getElementById('guess-slider').style.setProperty('--pct', pct + '%');
+  }
+
+  function makeGuess() {
+    document.getElementById('guess-btn').disabled = true;
+    document.getElementById('guess-btn').innerHTML = 'جاري التخمين... <span class="spinner"></span>';
+    conn.invoke("MakeGuess", guessNum).catch(e => console.error(e));
+  }
+
+  function playAgain() {
+    conn.invoke("PlayAgain").catch(e => console.error(e));
+  }
+
+  function goLobby() {
+    showScreen('screen-lobby');
+  }
+
+  // ─── UI helpers ───────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  function updatePlayerChips() {
+    document.getElementById('p1-name-chip').textContent = player1Name;
+    document.getElementById('p2-name-chip').textContent = player2Name;
+  }
+
+  function updateGamePlayerChips() {
+    document.getElementById('g-p1-name').textContent = player1Name;
+    document.getElementById('g-p2-name').textContent = player2Name;
+  }
+
+  function renderHistory() {
+    const el = document.getElementById('guess-history');
+    if (guessHistory.length === 0) {
+      el.innerHTML = '<div class="text-muted text-center" style="padding:20px">لسه ماشتش تخمينات 🤷</div>';
+      return;
+    }
+    el.innerHTML = guessHistory.map(g => `
+      <div class="guess-item">
+        <div>
+          <span style="color:var(--muted);font-size:0.8rem">${g.by}</span>
+          <span class="guess-number" style="margin:0 8px">${g.guess}</span>
+        </div>
+        <span class="hint-badge ${g.hint === 'أكبر' ? 'hint-bigger' : 'hint-smaller'}">
+          الرقم ${g.hint} ${g.hint === 'أكبر' ? '⬆️' : '⬇️'}
+        </span>
+      </div>
+    `).reverse().join('');
+    el.scrollTop = 0;
+  }
+
+  function launchConfetti() {
+    const wrap = document.getElementById('confetti');
+    wrap.innerHTML = '';
+    const colors = ['#7c3aed','#a855f7','#f59e0b','#10b981','#ef4444','#fcd34d'];
+    for (let i = 0; i < 80; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      p.style.cssText = `
+        left:${Math.random()*100}%;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        width:${6+Math.random()*10}px;
+        height:${6+Math.random()*10}px;
+        animation-duration:${2+Math.random()*3}s;
+        animation-delay:${Math.random()*1.5}s;
+        border-radius:${Math.random()>0.5?'50%':'2px'};
+      `;
+      wrap.appendChild(p);
+    }
+    setTimeout(() => wrap.innerHTML = '', 6000);
+  }
+
+  // Enter key support
+  document.addEventListener('keypress', e => {
+    if (e.key === 'Enter') {
+      const active = document.querySelector('.screen.active');
+      if (active.id === 'screen-register') register();
+      else if (active.id === 'screen-lobby' && document.getElementById('join-code').value) joinRoom();
+    }
+  });
+</script>
+</body>
+</html>
